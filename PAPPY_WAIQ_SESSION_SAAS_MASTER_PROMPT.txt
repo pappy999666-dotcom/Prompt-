@@ -1,0 +1,360 @@
+PAPPY WAIQ SESSION INTEGRATION SaaS — MASTER BUILD PROMPT
+
+ROLE
+
+Act as the lead architect and senior backend engineer. Build this as a permanent, production-grade SaaS integration platform. Optimize for correctness, security, maintainability, observability, and future expansion—not the shortest code.
+
+DO NOT start coding immediately.
+
+1. UNDERSTAND WAIQ FIRST
+
+Inspect the existing Pappy project and the available Omega-v1 blueprint/source.
+
+Omega-v1 is currently stopped, but it is the reference for understanding what an authorized Baileys-compatible session needs to provide to WAIQ.
+
+Determine exactly:
+- what WAIQ needs sessions to do
+- which Baileys operations are required
+- optional/future capabilities
+- required events and status information
+- what makes a session available, busy, disconnected, reconnecting, unhealthy, or revoked
+
+Before implementation, produce a concise capability map:
+WAIQ requirement → session capability → Baileys operation → permission/scope → health/status requirement.
+
+Do not blindly copy Omega-v1. Extract its useful behavior into a stable contract that future Pappy/WAIQ development can use.
+
+2. PERMANENT INTEGRATION CONTRACT
+
+Create one versioned integration contract that other developers using the same Baileys-compatible architecture can adopt.
+
+Developer Bot
+→ Official WAIQ SDK/adapter
+→ Secure WAIQ Integration API
+→ Authorized Session
+→ WAIQ workload
+
+Developers should not need a different API for each WAIQ feature. Use one official API with capability-based permissions.
+
+3. AUTHORIZED SESSION MODEL
+
+Only explicitly authorized sessions may participate.
+
+Never:
+- extract sessions from another bot
+- bypass authentication
+- accept stolen/raw credentials
+- expose session files or Baileys auth state
+- silently take control of a session
+
+A developer registers an integration and explicitly authorizes their own session.
+
+Track at minimum:
+integration_id, application_id, session_id, owner, permissions, capabilities, status, health, last_heartbeat, last_used, created_at, revoked_at.
+
+Every session operation must verify integration ownership and authorization.
+
+4. SMART SESSION POOL
+
+WAIQ should maintain a session pool and expose compact owner statistics:
+- total
+- available
+- busy
+- connecting
+- disconnected
+- reconnecting
+- unhealthy
+- revoked
+- cooldown
+- active workload
+
+Track per session:
+- last heartbeat
+- current job
+- recent failures
+- success rate
+- latency
+- cooldown
+- capabilities
+- utilization
+- priority if configured
+
+Do not choose the first session or use random selection by default.
+
+5. SMART SESSION ALLOCATION
+
+When a WAIQ job needs a session:
+- identify required capabilities
+- exclude unauthorized/revoked/unhealthy/busy sessions
+- consider health, utilization, cooldown, recent failures, latency, and priority
+- select the best eligible session deterministically
+- create a durable lease
+- execute the workload
+- release the lease
+- update health metrics
+
+6. DURABLE LEASES
+
+Create a lease containing:
+job_id, session_id, integration_id, operation, worker_id, started_at, expires_at, status.
+
+Use leases/locks so two workers cannot incorrectly use the same session simultaneously for incompatible work.
+
+Recover expired leases safely after worker crashes.
+
+7. CAPABILITY-BASED PERMISSIONS
+
+Use least privilege.
+
+Possible capabilities include only those actually required by the Omega-v1/WAIQ analysis, for example:
+- SESSION_STATUS
+- READ_SUPPORTED_EVENTS
+- SEND_MESSAGE
+- SEND_MEDIA
+- GROUP_OPERATIONS
+
+Do not expose unrestricted session access by default.
+
+8. VERSIONED API
+
+Build a clean API such as:
+/api/v1/integrations/me
+/api/v1/integrations/me/sessions
+/api/v1/integrations/me/sessions/:id
+/api/v1/integrations/me/heartbeat
+/api/v1/integrations/me/revoke
+
+Add only endpoints WAIQ actually needs.
+
+Never expose raw Baileys internals or credentials through the API.
+
+Every request must enforce:
+authentication → integration ownership → permission → capability → resource ownership.
+
+9. OFFICIAL SDK / DEVELOPER EXPERIENCE
+
+Create one official WAIQ integration package/adapter for participating developers.
+
+The developer documentation should explain:
+- what WAIQ is
+- supported Baileys versions
+- installation
+- configuration
+- registration
+- authorization
+- required permissions
+- connection lifecycle
+- heartbeat
+- revocation
+- errors
+- rate limits
+- examples
+
+A developer should not need to hunt for separate APIs.
+
+10. DEVELOPER WEBSITE / PORTAL
+
+The existing web property can be used as the public developer portal.
+
+Design the backend so the site can cleanly expose:
+- Getting Started
+- SDK
+- API reference
+- Capabilities
+- Sessions
+- Health
+- Examples
+- Versioning
+- Changelog
+- Service status
+
+Keep documentation public where appropriate, but enforce authorization server-side.
+
+11. OMEGA-v1 COMPATIBILITY
+
+Inspect the Omega-v1 blueprint/source carefully and identify the session lifecycle, events, operations, reconnect behavior, and failure handling WAIQ actually needs.
+
+Create compatibility adapters where necessary.
+
+Future internal WAIQ features should consume stable capabilities instead of depending on each developer bot's internal implementation.
+
+12. MULTI-TENANT ISOLATION
+
+Treat each developer/application as a tenant.
+
+Every resource query must enforce tenant ownership.
+
+Explicitly test Developer A attempting to access Developer B's session. It must fail cleanly.
+
+Never trust client-supplied session IDs without authorization checks.
+
+13. HEARTBEAT + HEALTH
+
+Implement lightweight heartbeat/status reporting.
+
+Track:
+- connection state
+- last heartbeat
+- last successful operation
+- consecutive failures
+- latency
+- cooldown
+- capabilities
+
+Do not poll aggressively.
+
+14. REVOKE / DISCONNECT
+
+Developers must be able to revoke access.
+
+On revoke:
+- immediately deny future API operations
+- safely release/cancel applicable leases
+- preserve audit history
+- never expose credentials
+
+15. SECURITY
+
+Implement:
+- authentication
+- authorization
+- capability checks
+- rate limiting
+- request validation
+- secure secret handling
+- audit logging
+- replay protection where appropriate
+- HTTPS for public deployment
+- safe error responses
+
+Never log tokens, auth files, cookies, private keys, credentials, or sensitive message content unless explicitly required and authorized.
+
+16. OWNER CONTROL PANEL
+
+Provide a compact WAIQ dashboard with:
+- integrations
+- session pool
+- available/busy/unhealthy sessions
+- capabilities
+- jobs
+- active leases
+- failures
+- rate limits
+- audit events
+
+Owner actions:
+- inspect integration
+- inspect session
+- revoke/disable integration
+- change permitted capabilities
+- inspect health
+- inspect current workload
+- review failures
+
+Require confirmation for destructive actions.
+
+17. OBSERVABILITY
+
+Use stable IDs such as integration_id, session_id, job_id.
+
+Audit events should include at least:
+INTEGRATION_CREATED
+SESSION_AUTHORIZED
+SESSION_CONNECTED
+SESSION_DISCONNECTED
+HEARTBEAT_RECEIVED
+SESSION_ASSIGNED
+LEASE_CREATED
+LEASE_EXPIRED
+SESSION_REVOKED
+API_AUTH_FAILED
+RATE_LIMITED
+WORKLOAD_COMPLETED
+WORKLOAD_FAILED
+
+Never include secrets in logs.
+
+18. RELIABILITY
+
+The service must survive:
+- WAIQ/API restart
+- worker crash
+- session disconnect
+- temporary network failure
+- VPS reboot
+
+Use durable state outside process memory.
+
+On startup:
+- recover/reconcile leases
+- restore session statuses
+- resume safe work
+- avoid duplicate operations
+
+19. VPS / GIT SAFETY
+
+Inspect the real deployment before changing it.
+
+Determine:
+- authoritative source checkout
+- Git repo/branch/commit
+- package manager
+- build process
+- systemd/PM2/Docker setup
+- environment configuration
+
+Do not delete existing sessions, overwrite unrelated production files, or restart the live service until source, build, tests, and rollback are confirmed.
+
+20. TESTING
+
+Write automated tests for:
+- authentication
+- tenant isolation
+- permissions/capabilities
+- registration
+- session assignment
+- deterministic allocation
+- busy/unhealthy exclusion
+- leases/expiry
+- heartbeat
+- reconnect
+- revocation
+- rate limiting
+- audit events
+- safe serialization
+- restart recovery
+
+Also validate the actual Omega-v1/WAIQ capability contract against the available code.
+
+21. DO NOT OVERENGINEER
+
+Do not add Redis, Kafka, Kubernetes, or unnecessary microservices merely because this is a SaaS.
+
+First understand the existing architecture. Add infrastructure only when durable state, scale, or reliability genuinely requires it.
+
+22. FINAL OUTPUT BEFORE IMPLEMENTATION
+
+First provide a concise architecture summary covering:
+1. What WAIQ needs from sessions.
+2. What Omega-v1 demonstrates.
+3. Stable capability contract.
+4. Session/integration data model.
+5. Session pool and deterministic allocation.
+6. API structure.
+7. SDK structure.
+8. Owner dashboard.
+9. Security model.
+10. Deployment plan.
+
+Then implement it.
+
+FINAL ENGINEERING PRINCIPLE
+
+Do not build a system where WAIQ simply “gets other bots' sessions.”
+
+Build a professional, consent-based, multi-tenant session integration platform where developers intentionally connect their own authorized Baileys-compatible sessions, grant defined capabilities, and can monitor or revoke access at any time.
+
+Stable abstraction:
+AUTHORIZED SESSION → CAPABILITIES → WAIQ JOB → SMART ALLOCATION → DURABLE LEASE → EXECUTION → HEALTH UPDATE → RELEASE.
+
+Make the integration stable enough for Omega-v1 compatibility today and future WAIQ development without forcing every connected developer to rewrite their bot.
